@@ -8,10 +8,8 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import MultiStepLR
 
 from tqdm import tqdm
-from tensorboardX import SummaryWriter
 from utils.network_utils import get_network
 from utils.data_utils import get_dataloader
-
 
 # fetch args
 parser = argparse.ArgumentParser()
@@ -52,7 +50,21 @@ parser.add_argument('--TInv', default=100, type=int)
 
 
 parser.add_argument('--prefix', default=None, type=str)
+
+parser.add_argument('--project',type=str,default="project",help="project name")
+parser.add_argument('--experiment',type=str, default="experiment",help="experiment name")
+
 args = parser.parse_args()
+
+try:
+    import wandb
+    wandb.init(
+        project=args.project,
+        name = args.experiment
+    )
+    logger = wandb.log
+except:
+    logger = print
 
 # init model
 nc = {
@@ -133,7 +145,6 @@ log_dir = os.path.join(args.log_dir, args.dataset, args.network, args.optimizer,
                        (args.learning_rate, args.weight_decay, args.damping))
 if not os.path.isdir(log_dir):
     os.makedirs(log_dir)
-writer = SummaryWriter(log_dir)
 
 
 def train(epoch):
@@ -147,7 +158,6 @@ def train(epoch):
     desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)' %
             (tag, lr_scheduler.get_lr()[0], 0, 0, correct, total))
 
-    writer.add_scalar('train/lr', lr_scheduler.get_lr()[0], epoch)
 
     prog_bar = tqdm(enumerate(trainloader), total=len(trainloader), desc=desc, leave=True)
     for batch_idx, (inputs, targets) in prog_bar:
@@ -177,8 +187,12 @@ def train(epoch):
                 (tag, lr_scheduler.get_lr()[0], train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
         prog_bar.set_description(desc, refresh=True)
 
-    writer.add_scalar('train/loss', train_loss/(batch_idx + 1), epoch)
-    writer.add_scalar('train/acc', 100. * correct / total, epoch)
+    logger({
+        "epoch" : epoch,
+        "lr" : lr_scheduler.get_lr()[0],
+        "train_loss" : train_loss/(batch_idx + 1),
+        "train_acc" : 100. * correct / total
+    },step=epoch)
 
 
 def test(epoch):
@@ -209,8 +223,10 @@ def test(epoch):
     # Save checkpoint.
     acc = 100.*correct/total
 
-    writer.add_scalar('test/loss', test_loss / (batch_idx + 1), epoch)
-    writer.add_scalar('test/acc', 100. * correct / total, epoch)
+    logger({
+        "test_loss" : test_loss / (batch_idx + 1),
+        "train_acc" : 100. * correct / total
+    },step=epoch)
 
     if acc > best_acc:
         print('Saving..')
