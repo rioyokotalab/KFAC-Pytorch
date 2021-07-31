@@ -225,7 +225,7 @@ def test(epoch):
 
     logger({
         "test_loss" : test_loss / (batch_idx + 1),
-        "train_acc" : 100. * correct / total
+        "test_acc" : 100. * correct / total
     },step=epoch)
 
     if acc > best_acc:
