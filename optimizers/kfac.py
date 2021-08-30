@@ -136,13 +136,16 @@ class KFACOptimizer(optim.Optimizer):
 
     def _kl_clip_and_update_grad(self, updates, lr):
         # do kl clip
-        vg_sum = 0
-        for m in self.modules:
-            v = updates[m]
-            vg_sum += (v[0] * m.weight.grad.data * lr ** 2).sum().item()
-            if m.bias is not None:
-                vg_sum += (v[1] * m.bias.grad.data * lr ** 2).sum().item()
-        nu = min(1.0, math.sqrt(self.kl_clip / vg_sum))
+        if self.kl_clip != 0:
+          vg_sum = 0
+          for m in self.modules:
+              v = updates[m]
+              vg_sum += (v[0] * m.weight.grad.data * lr ** 2).sum().item()
+              if m.bias is not None:
+                  vg_sum += (v[1] * m.bias.grad.data * lr ** 2).sum().item()
+          nu = min(1.0, math.sqrt(self.kl_clip / vg_sum))
+        else:
+          nu = 1.0
 
         for m in self.modules:
             v = updates[m]

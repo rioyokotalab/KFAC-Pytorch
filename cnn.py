@@ -5,6 +5,7 @@ import os
 from optimizers import (KFACOptimizer, EKFACOptimizer)
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim.lr_scheduler import MultiStepLR
 import wandb
@@ -19,7 +20,7 @@ from utils.data_utils import get_dataloader
 parser = argparse.ArgumentParser()
 
 
-parser.add_argument('--network', default='vgg16_bn', type=str)
+parser.add_argument('--network', default='cnn', type=str)
 #parser.add_argument('--depth', default=19, type=int)
 parser.add_argument('--dataset', default='cifar10', type=str)
 
@@ -58,7 +59,7 @@ parser.add_argument('--prefix', default=None, type=str)
 args = parser.parse_args()
 
 wandb.init(project="oss-kfac")
-wandb.run.name = "{}-lr{}-wd{}-m{}".format(args.optimizer, args.learning_rate, args.weight_decay, args.momentum)
+wandb.run.name = "cnn-{}-lr{}-wd{}-m{}".format(args.optimizer, args.learning_rate, args.weight_decay, args.momentum)
 if args.optimizer == "kfac":
   wandb.run.name += "-d{}-kl{}".format(args.damping, args.kl_clip)
 if args.name is not None:
@@ -70,14 +71,32 @@ nc = {
     'cifar100': 100
 }
 num_classes = nc[args.dataset]
-net = get_network(args.network,
-                  #depth=args.depth,
-                  num_classes=num_classes,
-                  #growthRate=args.growthRate,
-                  #compressionRate=args.compressionRate,
-                  #widen_factor=args.widen_factor,
-                  #dropRate=args.dropRate
-)
+
+class CNN(nn.Module):
+    def __init__(self):
+        super(CNN, self).__init__()
+        self.conv1 = nn.Conv2d(3, 32, 3)
+        self.conv2 = nn.Conv2d(32, 64, 3)
+        self.dropout1 = nn.Dropout2d(0.25)
+        self.dropout2 = nn.Dropout2d(0.5)
+        self.fc1 = nn.Linear(12544, 128)
+        self.fc2 = nn.Linear(128, 10)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = F.relu(x)
+        x = self.conv2(x)
+        x = F.relu(x)
+        x = F.max_pool2d(x, 2)
+        x = self.dropout1(x)
+        x = torch.flatten(x, 1)
+        x = self.fc1(x)
+        x = F.relu(x)
+        x = self.dropout2(x)
+        x = self.fc2(x)
+        output = F.log_softmax(x, dim=1)
+        return output
+net = CNN()
 net = net.to(args.device)
 
 # init dataloader

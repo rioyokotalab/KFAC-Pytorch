@@ -138,3 +138,6 @@ data/mnist_data
 
 checkpoint/
 runs/
+
+wandb
+output
