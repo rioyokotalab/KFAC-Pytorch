@@ -1,0 +1,17 @@
+#!/bin/bash 
+
+# yrun any_1
+# ybatch yokota-job
+
+#SBATCH -J kfac
+#YBATCH -r any_1
+#SBATCH -N 1
+#SBATCH -o output/o.$JOB_ID
+
+source /etc/profile.d/modules.sh
+module load cuda/11.2
+module load cudnn
+
+source $HOME/vir/py3/bin/activate
+
+wandb agent --count 50 cecilwang/oss-kfac/jmi588q6

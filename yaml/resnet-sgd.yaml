@@ -1,22 +1,22 @@
-name: cnn
+name: resnet-sgd
 project: oss-kfac
-program: cnn.py
+program: main.py
 method: grid
 metric:
   goal: minimize
   name: train_loss
 parameters:
+  network:
+    values: ['resnet']
+  depth:
+    values: [20]
   optimizer:
-    values: ['kfac', 'sgd']
+    values: ['sgd']
   learning_rate:
     values: [0.1, 0.01, 0.001]
   momentum:
     values: [0.9, 0.5, 0.1, 0.0]
   weight_decay:
-    values: [0.1, 0.01, 0.001, 0.0]
-  damping:
-    values: [1.0, 0.1, 0.01, 0.001]
-  kl_clip:
     values: [0.1, 0.01, 0.001, 0.0]
 early_terminate:
   type: hyperband

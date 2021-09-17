@@ -2,15 +2,15 @@
 import argparse
 from datetime import datetime
 import os
-from optimizers import (KFACOptimizer, EKFACOptimizer)
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import MultiStepLR
+from tqdm import tqdm
 import wandb
 
-from tqdm import tqdm
-from tensorboardX import SummaryWriter
+from optimizers import (KFACOptimizer, EKFACOptimizer)
 from utils.network_utils import get_network
 from utils.data_utils import get_dataloader
 
@@ -20,16 +20,16 @@ parser = argparse.ArgumentParser()
 
 
 parser.add_argument('--network', default='vgg16_bn', type=str)
-#parser.add_argument('--depth', default=19, type=int)
+parser.add_argument('--depth', default=19, type=int)
 parser.add_argument('--dataset', default='cifar10', type=str)
 
 # densenet
-#parser.add_argument('--growthRate', default=12, type=int)
-#parser.add_argument('--compressionRate', default=2, type=int)
+parser.add_argument('--growthRate', default=12, type=int)
+parser.add_argument('--compressionRate', default=2, type=int)
 
 # wrn, densenet
-#parser.add_argument('--widen_factor', default=1, type=int)
-#parser.add_argument('--dropRate', default=0.0, type=float)
+parser.add_argument('--widen_factor', default=1, type=int)
+parser.add_argument('--dropRate', default=0.0, type=float)
 
 
 parser.add_argument('--device', default='cuda', type=str)
@@ -58,7 +58,7 @@ parser.add_argument('--prefix', default=None, type=str)
 args = parser.parse_args()
 
 wandb.init(project="oss-kfac")
-wandb.run.name = "{}-lr{}-wd{}-m{}".format(args.optimizer, args.learning_rate, args.weight_decay, args.momentum)
+wandb.run.name = "{}-{}-lr{}-wd{}-m{}".format(args.network, args.optimizer, args.learning_rate, args.weight_decay, args.momentum)
 if args.optimizer == "kfac":
   wandb.run.name += "-d{}-kl{}".format(args.damping, args.kl_clip)
 if args.name is not None:
@@ -71,12 +71,12 @@ nc = {
 }
 num_classes = nc[args.dataset]
 net = get_network(args.network,
-                  #depth=args.depth,
+                  depth=args.depth,
                   num_classes=num_classes,
-                  #growthRate=args.growthRate,
-                  #compressionRate=args.compressionRate,
-                  #widen_factor=args.widen_factor,
-                  #dropRate=args.dropRate
+                  growthRate=args.growthRate,
+                  compressionRate=args.compressionRate,
+                  widen_factor=args.widen_factor,
+                  dropRate=args.dropRate
 )
 net = net.to(args.device)
 
@@ -144,7 +144,6 @@ log_dir = os.path.join(args.log_dir, args.dataset, args.network, args.optimizer,
                        (args.learning_rate, args.weight_decay, args.damping))
 if not os.path.isdir(log_dir):
     os.makedirs(log_dir)
-writer = SummaryWriter(log_dir)
 
 
 def train(epoch):
@@ -158,7 +157,6 @@ def train(epoch):
     desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)' %
             (tag, lr_scheduler.get_lr()[0], 0, 0, correct, total))
 
-    writer.add_scalar('train/lr', lr_scheduler.get_lr()[0], epoch)
 
     prog_bar = tqdm(enumerate(trainloader), total=len(trainloader), desc=desc, leave=True)
     for batch_idx, (inputs, targets) in prog_bar:
@@ -189,9 +187,7 @@ def train(epoch):
         prog_bar.set_description(desc, refresh=True)
         #wandb.log({"lr": lr_scheduler.get_lr()[0]})
 
-    writer.add_scalar('train/loss', train_loss/(batch_idx + 1), epoch)
-    writer.add_scalar('train/acc', 100. * correct / total, epoch)
-    wandb.log({"train_loss": train_loss/(batch_idx + 1), "train_acc":  100. * correct / total})
+    wandb.log({"train_loss": train_loss/(batch_idx + 1), "train_acc":  100. * correct / total}, commit=False)
 
 
 def test(epoch):
@@ -222,8 +218,6 @@ def test(epoch):
     # Save checkpoint.
     acc = 100.*correct/total
 
-    writer.add_scalar('test/loss', test_loss / (batch_idx + 1), epoch)
-    writer.add_scalar('test/acc', 100. * correct / total, epoch)
     wandb.log({"test_loss": test_loss/(batch_idx + 1), "test_acc":  100. * correct / total})
 
     if False and acc > best_acc:
@@ -252,5 +246,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
