@@ -1,3 +1,5 @@
+import os
+
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -32,6 +34,23 @@ def get_transforms(dataset):
             transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
         ])
 
+    if dataset == 'imagenet':
+        transform_train = transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225]),
+        ])
+        transform_test = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225]),
+        ])
+
+
     assert transform_test is not None and transform_train is not None, 'Error, no dataset %s' % dataset
     return transform_train, transform_test
 
@@ -47,11 +66,15 @@ def get_dataloader(dataset, train_batch_size, test_batch_size, num_workers=2, ro
         trainset = torchvision.datasets.CIFAR100(root=root, train=True, download=True, transform=transform_train)
         testset = torchvision.datasets.CIFAR100(root=root, train=False, download=True, transform=transform_test)
 
+    if dataset == 'imagenet':
+        trainset = torchvision.datasets.ImageFolder(os.path.join(root, 'train'), transform_train)
+        testset = torchvision.datasets.ImageFolder(os.path.join(root, 'val'), transform_test)
+
 
     assert trainset is not None and testset is not None, 'Error, no dataset %s' % dataset
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=train_batch_size, shuffle=True,
-                                              num_workers=num_workers)
+                                              num_workers=num_workers, pin_memory=True)
     testloader = torch.utils.data.DataLoader(testset, batch_size=test_batch_size, shuffle=False,
-                                             num_workers=num_workers)
+                                             num_workers=num_workers, pin_memory=True)
 
     return trainloader, testloader

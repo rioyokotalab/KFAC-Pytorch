@@ -36,10 +36,11 @@ parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--resume', '-r', action='store_true')
 parser.add_argument('--load_path', default='', type=str)
 parser.add_argument('--log_dir', default='runs/pretrain', type=str)
+parser.add_argument('--data_dir', default='../data', type=str)
 
 
 parser.add_argument('--optimizer', default='kfac', type=str)
-parser.add_argument('--batch_size', default=512, type=float)
+parser.add_argument('--batch_size', default=512, type=int)
 parser.add_argument('--epoch', default=100, type=int)
 parser.add_argument('--milestone', default=None, type=str)
 parser.add_argument('--learning_rate', default=0.01, type=float)
@@ -67,7 +68,8 @@ if args.name is not None:
 # init model
 nc = {
     'cifar10': 10,
-    'cifar100': 100
+    'cifar100': 100,
+    'imagenet': 1000
 }
 num_classes = nc[args.dataset]
 net = get_network(args.network,
@@ -83,7 +85,8 @@ net = net.to(args.device)
 # init dataloader
 trainloader, testloader = get_dataloader(dataset=args.dataset,
                                          train_batch_size=args.batch_size,
-                                         test_batch_size=256)
+                                         test_batch_size=256,
+                                         root=args.data_dir)
 
 # init optimizer and lr scheduler
 optim_name = args.optimizer.lower()
@@ -220,7 +223,7 @@ def test(epoch):
 
     wandb.log({"test_loss": test_loss/(batch_idx + 1), "test_acc":  100. * correct / total})
 
-    if False and acc > best_acc:
+    if acc > best_acc:
         print('Saving..')
         state = {
             'net': net.state_dict(),

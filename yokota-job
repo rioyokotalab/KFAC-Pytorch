@@ -4,14 +4,15 @@
 # ybatch yokota-job
 
 #SBATCH -J kfac
-#YBATCH -r any_1
+#YBATCH -r titanrtx
 #SBATCH -N 1
-#SBATCH -o output/o.$JOB_ID
+#SBATCH -o output/log
 
 source /etc/profile.d/modules.sh
-module load cuda/11.2
+module load cuda/11.4
 module load cudnn
 
 source $HOME/vir/py3/bin/activate
 
-wandb agent --count 50 cecilwang/oss-kfac/jmi588q6
+python main.py --network=resnet50 --dataset=imagenet --data_dir=/mnt/nfs/datasets/ILSVRC2012 --batch_size=128 --optimizer=kfac --learning_rate=0.1 --weight_decay=0.001 --damping=0.1 --momentum=0.9 --kl_clip=0.001
+#wandb agent --count 50 cecilwang/oss-kfac/0huf6hce 

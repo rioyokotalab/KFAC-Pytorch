@@ -1,3 +1,5 @@
+import torchvision
+
 from models.cifar import (alexnet, densenet, resnet,
                           vgg16_bn, vgg19_bn,
                           wrn)
@@ -13,6 +15,7 @@ def get_network(network, **kwargs):
         'wrn': wrn
 
     }
-
+    if network == 'resnet50':
+        return torchvision.models.resnet50()
     return networks[network](**kwargs)
 
