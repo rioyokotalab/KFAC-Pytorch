@@ -1,0 +1,19 @@
+#!/bin/bash
+#------- qsub option -----------
+#PBS -q SQUID
+#PBS --group=jh210024
+#PBS -N kfac
+#PBS -j o
+#PBS -b 1
+#PBS -l gpunum_job=8
+#PBS -l elapstim_req=24:00:00
+
+module load BaseGPU/2021
+source /sqfs/home/z6b038/vir/py3/bin/activate
+
+cd /sqfs/home/z6b038/KFAC-Pytorch
+
+export WANDB_MODE=offline
+
+#python main_multi_gpus.py -a=resnet50 --dist-url 'tcp://127.0.0.1:2333' --dist-backend 'nccl' --multiprocessing-distributed --world-size 1 --rank 0 -b=2048 -j=32 --optimizer=kfac --lr=0.1 --wd=0.001 --damping=0.1 --momentum=0.9 --kl_clip=0.001 --TCov=10 --TInv=100 /sqfs/work/jh210024/data/ILSVRC2012/
+python main_multi_gpus.py -a=resnet50 --dist-url 'tcp://127.0.0.1:2333' --dist-backend 'nccl' --multiprocessing-distributed --world-size 1 --rank 0 -b=2048 -j=32 --optimizer=sgd /sqfs/work/jh210024/data/ILSVRC2012/

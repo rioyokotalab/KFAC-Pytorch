@@ -91,12 +91,6 @@ best_acc1 = 0
 
 def main():
     args = parser.parse_args()
-    wandb.init(project="oss-kfac")
-    wandb.run.name = "{}-{}-lr{}-wd{}-m{}".format(args.arch, args.optimizer, args.lr, args.weight_decay, args.momentum)
-    if args.optimizer == "kfac":
-      wandb.run.name += "-d{}-kl{}".format(args.damping, args.kl_clip)
-    if args.name is not None:
-      wandb.run.name += "-{}".format(args.name)
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -136,6 +130,16 @@ def main_worker(gpu, ngpus_per_node, args):
 
     if args.gpu is not None:
         print("Use GPU: {} for training".format(args.gpu))
+  
+    runname = "{}-{}-lr{}-wd{}-m{}".format(args.arch, args.optimizer, args.lr, args.weight_decay, args.momentum)
+    if args.optimizer == "kfac":
+        runname += "-d{}-kl{}".format(args.damping, args.kl_clip)
+    if args.name is not None:
+        runname += "-{}".format(args.name)
+
+    if args.gpu == 0:
+        wandb.init(project="oss-kfac")
+        wandb.run.name = runname 
 
     if args.distributed:
         if args.dist_url == "env://" and args.rank == -1:
@@ -189,7 +193,7 @@ def main_worker(gpu, ngpus_per_node, args):
     criterion = nn.CrossEntropyLoss().cuda(args.gpu)
 
     if args.optimizer == 'sgd':
-        optimizer = optim.SGD(model.parameters(),
+        optimizer = torch.optim.SGD(model.parameters(),
                               lr=args.lr,
                               momentum=args.momentum,
                               weight_decay=args.weight_decay)
@@ -202,7 +206,8 @@ def main_worker(gpu, ngpus_per_node, args):
                                   kl_clip=args.kl_clip,
                                   weight_decay=args.weight_decay,
                                   TCov=args.TCov,
-                                  TInv=args.TInv)
+                                  TInv=args.TInv,
+                                  n_distributed=ngpus_per_node)
 
     # optionally resume from a checkpoint
     if args.resume:
@@ -289,7 +294,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'state_dict': model.state_dict(),
                 'best_acc1': best_acc1,
                 'optimizer' : optimizer.state_dict(),
-            }, is_best)
+            }, is_best, "output/{}".format(runname), epoch+1)
 
 
 def train(train_loader, model, criterion, optimizer, epoch, args):
@@ -348,7 +353,8 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
 
         if i % args.print_freq == 0:
             progress.display(i)
-    wandb.log({"train_loss": loeese.avg, "train_acc":  top1.avg}, commit=False)
+    if args.gpu == 0:
+        wandb.log({"train_loss": losses.avg, "train_acc":  top1.avg}, commit=False)
 
 
 def validate(val_loader, model, criterion, args):
@@ -392,15 +398,17 @@ def validate(val_loader, model, criterion, args):
         # TODO: this should also be done with the ProgressMeter
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
-        wandb.log({"test_acc":  top1.avg})
+        if args.gpu == 0:
+            wandb.log({"test_acc":  top1.avg})
 
     return top1.avg
 
 
-def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
-    torch.save(state, filename)
+def save_checkpoint(state, is_best, folder, epoch):
+    #torch.save(state, "{}/{}".format(folder, epoch))
     if is_best:
-        shutil.copyfile(filename, 'model_best.pth.tar')
+        torch.save(state, "{}/{}".format(folder, "best"))
+        #shutil.copyfile("{}/{}".format(folder, epoch), "{}/{}".format(folder, epoch))
 
 
 class AverageMeter(object):
