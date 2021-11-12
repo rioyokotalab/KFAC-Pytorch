@@ -92,9 +92,9 @@ class KFACOptimizer(optim.Optimizer):
         :return: no returns.
         """
         if self.n_distributed is not None:
-            dist.all_reduce(self.m_aa[m], op=ReduceOp.SUM)
+            dist.all_reduce(self.m_aa[m], op=dist.ReduceOp.SUM)
             self.m_aa[m] /= self.n_distributed
-            dist.all_reduce(self.m_gg[m], op=ReduceOp.SUM)
+            dist.all_reduce(self.m_gg[m], op=dist.ReduceOp.SUM)
             self.m_gg[m] /= self.n_distributed
         eps = 1e-10  # for numerical stability
         self.d_a[m], self.Q_a[m] = torch.symeig(
