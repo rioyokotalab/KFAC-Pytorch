@@ -1,18 +1,21 @@
-#!/bin/bash 
+#!/bin/bash
 
 # yrun any_1
 # ybatch yokota-job
 
 #SBATCH -J kfac
-#YBATCH -r titanrtx
-#SBATCH -N 1
+#YBATCH -r am
+#SBATCH -N 2
 #SBATCH -o output/log
 
 source /etc/profile.d/modules.sh
 module load cuda/11.4
 module load cudnn
+module load nccl
 
 source $HOME/vir/py3/bin/activate
 
-python main.py --network=resnet50 --dataset=imagenet --data_dir=/mnt/nfs/datasets/ILSVRC2012 --batch_size=128 --optimizer=kfac --learning_rate=0.1 --weight_decay=0.001 --damping=0.1 --momentum=0.9 --kl_clip=0.001
-#wandb agent --count 50 cecilwang/oss-kfac/0huf6hce 
+python main_multi_gpus.py -a=resnet50 --dist-url 'tcp://127.0.0.1:2333' --dist-backend 'nccl' --multiprocessing-distributed --world-size 1 --rank 0 -b=256 --optimizer=kfac --lr=0.1 --wd=0.001 --damping=0.1 --momentum=0.9 --kl_clip=0.001 --TCov=100 --TInv=1000 /mnt/nfs/datasets/ILSVRC2012
+#python main.py --network=resnet50 --dataset=imagenet --data_dir=/mnt/nfs/datasets/ILSVRC2012 --batch_size=128 --optimizer=kfac --learning_rate=0.1 --weight_decay=0.001 --damping=0.1 --momentum=0.9 --kl_clip=0.001 --TCov=100 --TInv=1000
+#wandb agent --count 50 cecilwang/oss-kfac/0huf6hce
+#pip3 install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio==0.10.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
