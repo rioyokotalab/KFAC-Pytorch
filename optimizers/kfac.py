@@ -74,7 +74,7 @@ class KFACOptimizer(optim.Optimizer):
 
     def _prepare_model(self):
         count = 0
-        print(self.model)
+        #print(self.model)
         print("=> We keep following layers in KFAC. ")
         for module in self.model.modules():
             classname = module.__class__.__name__
@@ -96,6 +96,7 @@ class KFACOptimizer(optim.Optimizer):
             self.m_aa[m] /= self.n_distributed
             dist.all_reduce(self.m_gg[m], op=dist.ReduceOp.SUM)
             self.m_gg[m] /= self.n_distributed
+
         eps = 1e-10  # for numerical stability
         self.d_a[m], self.Q_a[m] = torch.symeig(
             self.m_aa[m], eigenvectors=True)
@@ -139,7 +140,6 @@ class KFACOptimizer(optim.Optimizer):
             v[1] = v[1].view(m.bias.grad.data.size())
         else:
             v = [v.view(m.weight.grad.data.size())]
-
         return v
 
     def _kl_clip_and_update_grad(self, updates, lr):
@@ -185,12 +185,16 @@ class KFACOptimizer(optim.Optimizer):
                         buf = param_state['momentum_buffer']
                         buf.mul_(momentum).add_(1, d_p)
                     d_p = buf
-
                 p.data.add_(-group['lr'], d_p)
+
 
     def step(self, closure=None):
         # FIXME(CW): temporal fix for compatibility with Official LR scheduler.
         group = self.param_groups[0]
+        if self.n_distributed is not None:
+            for p in group['params']:
+                dist.all_reduce(p.grad, op=dist.ReduceOp.SUM)
+                p.grad /= self.n_distributed
         lr = group['lr']
         damping = group['damping']
         updates = {}

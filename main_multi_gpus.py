@@ -1,5 +1,6 @@
 import argparse
 import os
+from pathlib import Path
 import random
 import shutil
 import time
@@ -130,16 +131,15 @@ def main_worker(gpu, ngpus_per_node, args):
 
     if args.gpu is not None:
         print("Use GPU: {} for training".format(args.gpu))
-  
+
     runname = "{}-{}-lr{}-wd{}-m{}".format(args.arch, args.optimizer, args.lr, args.weight_decay, args.momentum)
     if args.optimizer == "kfac":
         runname += "-d{}-kl{}".format(args.damping, args.kl_clip)
     if args.name is not None:
         runname += "-{}".format(args.name)
 
-    if args.gpu == 0:
-        wandb.init(project="oss-kfac")
-        wandb.run.name = runname 
+    #wandb.init(project="oss-kfac", group="0")
+    #wandb.run.name = runname
 
     if args.distributed:
         if args.dist_url == "env://" and args.rank == -1:
@@ -219,7 +219,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 # Map model to be loaded to specified single gpu.
                 loc = 'cuda:{}'.format(args.gpu)
                 checkpoint = torch.load(args.resume, map_location=loc)
-            args.start_epoch = checkpoint['epoch']
+            args.start_epoch = checkpoint['epoch'] + 1
             best_acc1 = checkpoint['best_acc1']
             if args.gpu is not None:
                 # best_acc1 may be from a checkpoint from a different GPU
@@ -268,7 +268,7 @@ def main_worker(gpu, ngpus_per_node, args):
         num_workers=args.workers, pin_memory=True)
 
     if args.evaluate:
-        validate(val_loader, model, criterion, args)
+        validate(val_loader, model, criterion, -1, args)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -280,22 +280,21 @@ def main_worker(gpu, ngpus_per_node, args):
         train(train_loader, model, criterion, optimizer, epoch, args)
 
         # evaluate on validation set
-        acc1 = validate(val_loader, model, criterion, args)
+        acc1 = validate(val_loader, model, criterion, epoch, args)
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
 
-        #if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-        #        and args.rank % ngpus_per_node == 0):
-        #    save_checkpoint({
-        #        'epoch': epoch + 1,
-        #        'arch': args.arch,
-        #        'state_dict': model.state_dict(),
-        #        'best_acc1': best_acc1,
-        #        'optimizer' : optimizer.state_dict(),
-        #    }, is_best, "output/{}".format(runname), epoch+1)
-        break
+        if not args.multiprocessing_distributed or (args.multiprocessing_distributed
+                and args.rank % ngpus_per_node == 0):
+            save_checkpoint({
+                'epoch': epoch,
+                'arch': args.arch,
+                'state_dict': model.state_dict(),
+                'best_acc1': best_acc1,
+                'optimizer' : optimizer.state_dict(),
+            }, is_best, "output/{}".format(runname), epoch)
 
 
 def train(train_loader, model, criterion, optimizer, epoch, args):
@@ -354,12 +353,10 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
 
         if i % args.print_freq == 0:
             progress.display(i)
-            break
-    if args.gpu == 0:
-        wandb.log({"train_loss": losses.avg, "train_acc":  top1.avg}, commit=False)
+    #wandb.log({"train_loss": losses.avg, "train_acc":  top1.avg}, commit=False)
 
 
-def validate(val_loader, model, criterion, args):
+def validate(val_loader, model, criterion, epoch, args):
     batch_time = AverageMeter('Time', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
@@ -371,12 +368,10 @@ def validate(val_loader, model, criterion, args):
 
     # switch to evaluate mode
     model.eval()
-    
+
     with torch.no_grad():
         end = time.time()
         for i, (images, target) in enumerate(val_loader):
-            if args.gpu == 0:
-                print("sxwang")
             if args.gpu is not None:
                 images = images.cuda(args.gpu, non_blocking=True)
             if torch.cuda.is_available():
@@ -398,26 +393,19 @@ def validate(val_loader, model, criterion, args):
 
             if i % args.print_freq == 0:
                 progress.display(i)
-                break
 
         # TODO: this should also be done with the ProgressMeter
-        print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
-              .format(top1=top1, top5=top5))
-        if args.gpu == 0:
-            wandb.log({"test_acc":  top1.avg})
-            print("love test")
+        print('Test: [{epoch}] Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
+              .format(epoch=epoch, top1=top1, top5=top5))
+        #wandb.log({"test_acc":  top1.avg})
 
     return top1.avg
 
 
 def save_checkpoint(state, is_best, folder, epoch):
-    #torch.save(state, "{}/{}".format(folder, epoch))
-    filiename = "{}/{}".format(folder, "best")
-    print("save " + filename)
     if is_best:
-        torch.save(state, filename)
-        #shutil.copyfile("{}/{}".format(folder, epoch), "{}/{}".format(folder, epoch))
-    print("save done")
+        Path(folder).mkdir(parents=True, exist_ok=True)
+        torch.save(state, os.path.join(folder,"best"))
 
 
 class AverageMeter(object):

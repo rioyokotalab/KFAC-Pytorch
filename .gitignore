@@ -141,3 +141,6 @@ runs/
 
 wandb
 output
+
+*.swp
+tags
