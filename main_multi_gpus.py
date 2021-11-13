@@ -286,15 +286,16 @@ def main_worker(gpu, ngpus_per_node, args):
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
 
-        if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                and args.rank % ngpus_per_node == 0):
-            save_checkpoint({
-                'epoch': epoch + 1,
-                'arch': args.arch,
-                'state_dict': model.state_dict(),
-                'best_acc1': best_acc1,
-                'optimizer' : optimizer.state_dict(),
-            }, is_best, "output/{}".format(runname), epoch+1)
+        #if not args.multiprocessing_distributed or (args.multiprocessing_distributed
+        #        and args.rank % ngpus_per_node == 0):
+        #    save_checkpoint({
+        #        'epoch': epoch + 1,
+        #        'arch': args.arch,
+        #        'state_dict': model.state_dict(),
+        #        'best_acc1': best_acc1,
+        #        'optimizer' : optimizer.state_dict(),
+        #    }, is_best, "output/{}".format(runname), epoch+1)
+        break
 
 
 def train(train_loader, model, criterion, optimizer, epoch, args):
@@ -353,6 +354,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
 
         if i % args.print_freq == 0:
             progress.display(i)
+            break
     if args.gpu == 0:
         wandb.log({"train_loss": losses.avg, "train_acc":  top1.avg}, commit=False)
 
@@ -369,10 +371,12 @@ def validate(val_loader, model, criterion, args):
 
     # switch to evaluate mode
     model.eval()
-
+    
     with torch.no_grad():
         end = time.time()
         for i, (images, target) in enumerate(val_loader):
+            if args.gpu == 0:
+                print("sxwang")
             if args.gpu is not None:
                 images = images.cuda(args.gpu, non_blocking=True)
             if torch.cuda.is_available():
@@ -394,21 +398,26 @@ def validate(val_loader, model, criterion, args):
 
             if i % args.print_freq == 0:
                 progress.display(i)
+                break
 
         # TODO: this should also be done with the ProgressMeter
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
         if args.gpu == 0:
             wandb.log({"test_acc":  top1.avg})
+            print("love test")
 
     return top1.avg
 
 
 def save_checkpoint(state, is_best, folder, epoch):
     #torch.save(state, "{}/{}".format(folder, epoch))
+    filiename = "{}/{}".format(folder, "best")
+    print("save " + filename)
     if is_best:
-        torch.save(state, "{}/{}".format(folder, "best"))
+        torch.save(state, filename)
         #shutil.copyfile("{}/{}".format(folder, epoch), "{}/{}".format(folder, epoch))
+    print("save done")
 
 
 class AverageMeter(object):
